@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\AlertStatus;
+use App\Models\EmergencyContact;
 use App\Models\Logistic;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -12,10 +13,14 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database with initial village alert status and evacuation logistics.
+     * Seed the application's database with default admin user, village alert status, emergency contacts, and logistics.
      */
     public function run(): void
     {
+        $this->call([
+            AdminUserSeeder::class,
+        ]);
+
         AlertStatus::query()->updateOrCreate(
             ['id' => 1],
             [
@@ -26,16 +31,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        \App\Models\EmergencyContact::seedDefaults();
-
-        \App\Models\User::query()->updateOrCreate(
-            ['username' => 'admin'],
-            [
-                'name' => 'Administrator Posko',
-                'email' => 'admin@kalikurmo.desa.id',
-                'password' => \Illuminate\Support\Facades\Hash::make('admin'),
-            ]
-        );
+        EmergencyContact::seedDefaults();
 
         $initialLogistics = [
             [
