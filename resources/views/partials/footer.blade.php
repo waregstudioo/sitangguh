@@ -3,9 +3,9 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
                 <div class="flex items-center gap-3 mb-3">
-                    <div class="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold">
-                        K
-                    </div>
+                    <img src="{{ asset('icon.png') }}"
+                         alt="Logo Posko Tangguh Desa Kalikurmo"
+                         class="w-8 h-8 rounded-lg object-cover border border-slate-700">
                     <span class="font-bold text-white text-lg">Posko Tangguh Desa Kalikurmo</span>
                 </div>
                 <p class="text-sm text-slate-400 leading-relaxed">
