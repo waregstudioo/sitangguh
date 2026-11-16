@@ -21,9 +21,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
 
 # Naikkan batas ukuran upload foto (maks 10MB di validasi) dan memori GD
 RUN { \
-        echo "upload_max_filesize = 16M"; \
-        echo "post_max_size = 20M"; \
-        echo "memory_limit = 256M"; \
+    echo "upload_max_filesize = 16M"; \
+    echo "post_max_size = 20M"; \
+    echo "memory_limit = 256M"; \
     } > /usr/local/etc/php/conf.d/uploads.ini
 
 # Install Composer

@@ -22,6 +22,7 @@ class Report extends Model
         'latitude',
         'longitude',
         'image_path',
+        'image_public_id',
         'status',
     ];
 
@@ -43,6 +44,11 @@ class Report extends Model
      */
     public function getImageUrlAttribute(): string
     {
+        if (str_starts_with((string) $this->image_path, 'http://')
+            || str_starts_with((string) $this->image_path, 'https://')) {
+            return (string) $this->image_path;
+        }
+
         return Storage::disk('public')->url($this->image_path);
     }
 }

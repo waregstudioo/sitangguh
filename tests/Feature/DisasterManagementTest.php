@@ -47,6 +47,7 @@ test('homepage renders global alert banner, leaflet map centered on hardcoded Ka
 });
 
 test('citizen report submission with latitude and longitude compresses uploaded photo via Intervention Image and stores report', function (): void {
+    config(['cloudinary.url' => null]);
     Storage::fake('public');
 
     $fakeImage = UploadedFile::fake()->image('longsor-kalikurmo.png', 1800, 1400);
@@ -82,13 +83,6 @@ test('guest cannot access admin dashboard and is redirected to login', function 
 });
 
 test('admin can log in using username and password', function (): void {
-    User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
-
     $response = $this->post(route('login.post'), [
         'username' => 'admin',
         'password' => 'admin',
@@ -99,12 +93,14 @@ test('admin can log in using username and password', function (): void {
 });
 
 test('admin can update AlertStatus and it reflects globally on homepage banner', function (): void {
-    $admin = User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
 
     $response = $this->actingAs($admin)->put(route('admin.alert-status.update'), [
         'level' => AlertStatus::LEVEL_EMERGENCY,
@@ -124,12 +120,14 @@ test('admin can update AlertStatus and it reflects globally on homepage banner',
 });
 
 test('admin can perform full CRUD operations on Logistics', function (): void {
-    $admin = User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
 
     // Create
     $this->actingAs($admin)->post(route('logistics.store'), [
@@ -162,12 +160,14 @@ test('admin can perform full CRUD operations on Logistics', function (): void {
 });
 
 test('admin can perform CRUD on emergency contacts and reflects in footer', function (): void {
-    $admin = User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
 
     // Create
     $this->actingAs($admin)->post(route('emergency-contacts.store'), [
@@ -204,12 +204,14 @@ test('admin can perform CRUD on emergency contacts and reflects in footer', func
 });
 
 test('admin can update password with valid current password', function (): void {
-    $admin = User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
 
     $response = $this->actingAs($admin)->put(route('admin.password.update'), [
         'current_password' => 'admin',
@@ -224,12 +226,14 @@ test('admin can update password with valid current password', function (): void 
 });
 
 test('admin password update fails when current password is incorrect', function (): void {
-    $admin = User::query()->create([
-        'name' => 'Admin Test',
-        'username' => 'admin',
-        'email' => 'admin@test.com',
-        'password' => Hash::make('admin'),
-    ]);
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
 
     $response = $this->actingAs($admin)->put(route('admin.password.update'), [
         'current_password' => 'salah',
@@ -239,4 +243,54 @@ test('admin password update fails when current password is incorrect', function 
 
     $response->assertSessionHasErrors('current_password');
     expect(Hash::check('admin', $admin->fresh()->password))->toBeTrue();
+});
+
+test('report image_url returns external cloudinary url directly and stores public_id', function (): void {
+    $cloudUrl = 'https://res.cloudinary.com/demo/image/upload/v123/kalikurmo/reports/test.jpg';
+
+    $mockStorage = Mockery::mock(\App\Services\ReportImageStorage::class);
+    $mockStorage->shouldReceive('store')
+        ->once()
+        ->andReturn([
+            'path' => $cloudUrl,
+            'public_id' => 'kalikurmo/reports/test',
+        ]);
+    $mockStorage->shouldReceive('delete')
+        ->once()
+        ->with($cloudUrl, 'kalikurmo/reports/test');
+
+    $this->app->instance(\App\Services\ReportImageStorage::class, $mockStorage);
+
+    $fakeImage = UploadedFile::fake()->image('banjir.png', 1000, 800);
+
+    $this->post(route('reports.store'), [
+        'reporter_name' => 'Warga Cloudinary',
+        'category' => 'Banjir / Luapan Sungai',
+        'description' => 'Air meluap ke jalan dusun.',
+        'latitude' => -7.192342,
+        'longitude' => 110.563481,
+        'image' => $fakeImage,
+    ])->assertRedirect(route('home'));
+
+    $report = Report::query()->where('reporter_name', 'Warga Cloudinary')->first();
+
+    expect($report)->not->toBeNull()
+        ->and($report->image_path)->toBe($cloudUrl)
+        ->and($report->image_public_id)->toBe('kalikurmo/reports/test')
+        ->and($report->image_url)->toBe($cloudUrl);
+
+    $admin = User::query()->firstOrCreate(
+        ['username' => 'admin'],
+        [
+            'name' => 'Admin Test',
+            'email' => 'admin@test.com',
+            'password' => Hash::make('admin'),
+        ]
+    );
+
+    $this->actingAs($admin)
+        ->delete(route('reports.destroy', $report))
+        ->assertRedirect(route('admin.dashboard'));
+
+    expect(Report::query()->find($report->id))->toBeNull();
 });

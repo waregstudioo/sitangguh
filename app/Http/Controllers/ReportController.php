@@ -5,14 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\AlertStatus;
 use App\Models\Logistic;
 use App\Models\Report;
+use App\Services\ReportImageStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Intervention\Image\Drivers\Gd\Driver;
-use Intervention\Image\Encoders\JpegEncoder;
-use Intervention\Image\ImageManager;
 
 class ReportController extends Controller
 {
@@ -45,7 +41,7 @@ class ReportController extends Controller
     /**
      * Store a newly submitted citizen incident report and compress its photo via Intervention Image.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ReportImageStorage $imageStorage): RedirectResponse
     {
         $validated = $request->validate([
             'reporter_name' => ['nullable', 'string', 'max:100'],
@@ -56,18 +52,7 @@ class ReportController extends Controller
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ]);
 
-        $uploadedFile = $request->file('image');
-
-        $imageManager = ImageManager::usingDriver(Driver::class);
-        $image = $imageManager->decodePath($uploadedFile->getRealPath());
-
-        $image->scaleDown(width: 1280, height: 1280);
-
-        $encodedImage = $image->encode(new JpegEncoder(quality: 70, progressive: true, strip: true));
-
-        $relativePath = 'reports/'.now()->format('Ymd_His').'_'.Str::lower(Str::random(10)).'.jpg';
-
-        Storage::disk('public')->put($relativePath, (string) $encodedImage);
+        $storedImage = $imageStorage->store($request->file('image'));
 
         Report::query()->create([
             'reporter_name' => filled($validated['reporter_name'] ?? null)
@@ -77,7 +62,8 @@ class ReportController extends Controller
             'description' => $validated['description'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'image_path' => $relativePath,
+            'image_path' => $storedImage['path'],
+            'image_public_id' => $storedImage['public_id'],
             'status' => 'Pending',
         ]);
 
@@ -107,11 +93,9 @@ class ReportController extends Controller
     /**
      * Remove a citizen report and delete its compressed image from storage.
      */
-    public function destroy(Report $report): RedirectResponse
+    public function destroy(Report $report, ReportImageStorage $imageStorage): RedirectResponse
     {
-        if (filled($report->image_path) && Storage::disk('public')->exists($report->image_path)) {
-            Storage::disk('public')->delete($report->image_path);
-        }
+        $imageStorage->delete($report->image_path, $report->image_public_id);
 
         $report->delete();
 
